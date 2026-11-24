@@ -10,6 +10,7 @@ import {
   // @template:login-password:start
   login,
   // @template:login-password:end
+  refreshSession,
   setSessionExpiredHandler,
 } from './client';
 
@@ -295,5 +296,65 @@ describe('login and logout calls', () => {
     fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     await expect(logoutAll()).resolves.toBeUndefined();
+  });
+
+  describe('with the Web Locks API', () => {
+    // An exclusive lock: one holder at a time, in the order of the requests.
+    function stubLocks() {
+      let tail: Promise<unknown> = Promise.resolve();
+      const request = vi.fn((_name: string, run: () => Promise<unknown>) => {
+        const result = tail.then(run);
+        tail = result.catch(() => undefined);
+        return result;
+      });
+      vi.stubGlobal('navigator', { locks: { request } });
+
+      return request;
+    }
+
+    // A refresh that does not answer until the test says so, and a logout that answers at once.
+    function slowRefresh() {
+      let answer!: () => void;
+      fetchMock.mockImplementation((url) => {
+        if (url === '/api/auth/refresh') {
+          return new Promise<Response>((resolve) => { answer = () => resolve(new Response(null, { status: 204 })); });
+        }
+        return Promise.resolve(new Response(null, { status: 204 }));
+      });
+
+      return () => answer();
+    }
+
+    const sent = () => fetchMock.mock.calls.map(([url]) => url);
+
+    it.each([
+      ['logout', logout, '/api/auth/logout'],
+      ['logout from all devices', logoutAll, '/api/auth/logout-all'],
+    ])('should make the %s wait for a refresh in progress, so its answer cannot set cookies after the logout cleared them', async (_name, leave, path) => {
+      stubLocks();
+      const answerRefresh = slowRefresh();
+
+      const refreshing = refreshSession();
+      const leaving = leave();
+      await vi.waitFor(() => expect(sent()).toEqual(['/api/auth/refresh']));
+      await Promise.resolve();
+      expect(sent()).toEqual(['/api/auth/refresh']);
+
+      answerRefresh();
+      await expect(refreshing).resolves.toEqual({ status: 'renewed' });
+      await expect(leaving).resolves.toBeUndefined();
+
+      expect(sent()).toEqual(['/api/auth/refresh', path]);
+    });
+
+    it('should hold the lock named after the project for a logout, the same one the refresh takes', async () => {
+      const request = stubLocks();
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+      await logout();
+      await refreshSession();
+
+      expect(request.mock.calls.map(([name]) => name)).toEqual(['my-web-app-refresh', 'my-web-app-refresh']);
+    });
   });
 });

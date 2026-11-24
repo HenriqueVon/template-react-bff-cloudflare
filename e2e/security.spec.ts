@@ -21,10 +21,20 @@ test.describe('the protections, as the browser applies them', () => {
   test('breaks nothing under that policy: no violation while signing in and using the app', async ({ page }) => {
     const problems: string[] = [];
     page.on('console', (message) => {
-      // The 401 of the session check before the login is expected; anything about the policy is not.
-      if (/content security policy|refused to (load|apply|execute|connect)/i.test(message.text())) problems.push(message.text());
+      // The 401 of the session check before the login is expected; anything about the policy is not. Chrome says "Refused
+      // to ...", Firefox "Content-Security-Policy: ...".
+      if (/content[- ]security[- ]policy|refused to (load|apply|execute|connect)/i.test(message.text())) problems.push(message.text());
     });
     page.on('pageerror', (error) => problems.push(error.message));
+
+    // The browsers word the message differently, so the event is the reliable signal. It survives the reload below.
+    await page.exposeFunction('reportCspViolation', (text: string) => problems.push(text));
+    await page.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (event) => {
+        void (window as unknown as { reportCspViolation(text: string): Promise<void> })
+          .reportCspViolation(`${event.violatedDirective}: ${event.blockedURI}`);
+      });
+    });
 
     await signIn(page);
     await page.getByRole('button', { name: 'User menu' }).click();

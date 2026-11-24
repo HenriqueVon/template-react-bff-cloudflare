@@ -36,6 +36,13 @@ export default defineConfig({
 
   projects: [
     { name: channel, use: { ...devices['Desktop Chrome'], channel: channel === 'chromium' ? undefined : channel } },
+    // The session leans on what browsers do differently: Web Locks, BroadcastChannel, cookies and the CSP. Firefox runs the
+    // specs that exercise them. It has to be downloaded (`npx playwright install firefox`), so it is opt-in:
+    // E2E_FIREFOX=1, which the CI sets. WebKit is not covered: Safari does not keep a Secure cookie on http://localhost
+    // (pitfall 11 of docs/DEVELOPMENT.md), so the specs would fail for a reason that is not in the code.
+    ...(process.env.E2E_FIREFOX
+      ? [{ name: 'firefox', testMatch: /(session|security)\.spec\.ts$/, use: { ...devices['Desktop Firefox'] } }]
+      : []),
   ],
 
   webServer: [
