@@ -35,6 +35,7 @@ First version, extracted from two web apps of the same author.
 ### Fixed
 
 - A logout that does not reach the Functions (no connection) no longer shows the login page while the cookies are still valid, which a reload would bypass: the session is kept and the app says so. The idle logout closes the screen anyway and sends the logout when the app opens again.
+- The threat model of a generated project no longer carries the threat of the login it does not have (the Google flow or brute force of the password), nor the files and tests of the other login. The numbers do not change, so a generated table skips one. The `Test the init script` workflow checks it.
 - A logout that crossed a refresh in progress could leave new cookies in the browser, set by the late answer of the refresh after the logout cleared them. The logout and the logout from every device now take the same lock as the refresh.
 - The README said React Router 7 after the dependency moved to 8.
 

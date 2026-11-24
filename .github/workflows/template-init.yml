@@ -102,6 +102,10 @@ jobs:
               echo "::error::Code of the Google login is left in a project with the password login"
               failed=1
             fi
+            if grep -n -i -E "google|pkce|oauth" docs/THREAT-MODEL.md ; then
+              echo "::error::The threat model of a project with the password login mentions the Google login"
+              failed=1
+            fi
           else
             [ -f functions/api/auth/exchange.ts ] || { echo "::error::The Google login should be present"; failed=1; }
             for path in functions/api/auth/login.ts tests/bff/login.spec.ts; do
@@ -109,6 +113,10 @@ jobs:
             done
             if grep -rIn -E "login-password|AUTH_INVALID_CREDENTIALS|login\.password" --include='*.ts' --include='*.tsx' --include='*.mjs' . --exclude-dir=node_modules ; then
               echo "::error::Code of the password login is left in a project with the Google login"
+              failed=1
+            fi
+            if grep -n -i -E "brute force|LoginPage\.spec" docs/THREAT-MODEL.md ; then
+              echo "::error::The threat model of a project with the Google login mentions the password login"
               failed=1
             fi
           fi
