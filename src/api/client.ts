@@ -92,9 +92,19 @@ type RefreshResult =
 
 let refreshInFlight: Promise<RefreshResult> | null = null;
 
+// Everything that replaces or clears the session cookies (a refresh, a logout) takes this lock, so across tabs they run
+// one after the other and each one sends the cookie the one before it left. Without the Web Locks API the request just
+// runs, and the API's reuse detection is the safety net (docs/adr/0003-one-refresh-at-a-time.md).
+function withSessionLock<T>(run: () => Promise<T>): Promise<T> {
+  // The DOM types return Promise<Promise<T>> for request(); at runtime the inner promise is awaited.
+  return (typeof navigator !== 'undefined' && navigator.locks
+    ? navigator.locks.request('my-web-app-refresh', run)
+    : run()) as Promise<T>;
+}
+
 // An API that rotates refresh tokens ends the whole session when a replaced one is used again, so two refreshes must
-// never run at the same time. Inside a tab the promise is shared; across tabs the Web Locks API makes them wait for
-// each other, and the second one sends the new cookie.
+// never run at the same time. Inside a tab the promise is shared; across tabs the lock makes them wait for each other,
+// and the second one sends the new cookie.
 export function refreshSession(): Promise<RefreshResult> {
   if (refreshInFlight) return refreshInFlight;
 
@@ -110,12 +120,7 @@ export function refreshSession(): Promise<RefreshResult> {
     }
   };
 
-  // The DOM types return Promise<Promise<T>> for request(); at runtime the inner promise is awaited.
-  const locked = (typeof navigator !== 'undefined' && navigator.locks
-    ? navigator.locks.request('my-web-app-refresh', run)
-    : run()) as Promise<RefreshResult>;
-
-  const inFlight = locked.finally(() => {
+  const inFlight = withSessionLock(run).finally(() => {
     refreshInFlight = null;
   });
   refreshInFlight = inFlight;
@@ -186,13 +191,21 @@ export async function exchangeCode(code: string, state: string): Promise<void> {
 // cookies, even if the API could not be told. So a failure here means the request never reached the Function (no
 // connection, a gateway error): the cookies are still in the browser, and JavaScript cannot clear them. It is thrown, so
 // the app says so instead of showing a login page that a reload would bypass.
-export async function logout(): Promise<void> {
-  const response = await send('/api/auth/logout', { method: 'POST' });
-  if (!response.ok) throw await toApiError(response);
+//
+// It waits for a refresh in progress, in this tab or in another: otherwise the answer of that refresh could set new cookies
+// after the logout cleared them, and the browser would keep a session the user just left. After the wait it sends the
+// newest cookie.
+export function logout(): Promise<void> {
+  return withSessionLock(async () => {
+    const response = await send('/api/auth/logout', { method: 'POST' });
+    if (!response.ok) throw await toApiError(response);
+  });
 }
 
-// Unlike logout, a failure is thrown: the other sessions are still open, so the app must say so.
-export async function logoutAll(): Promise<void> {
-  const response = await send('/api/auth/logout-all', { method: 'POST' });
-  if (!response.ok) throw await toApiError(response);
+// Unlike logout, a failure is thrown: the other sessions are still open, so the app must say so. It takes the same lock.
+export function logoutAll(): Promise<void> {
+  return withSessionLock(async () => {
+    const response = await send('/api/auth/logout-all', { method: 'POST' });
+    if (!response.ok) throw await toApiError(response);
+  });
 }

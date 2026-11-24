@@ -95,6 +95,43 @@ jobs:
             test-results/
           retention-days: 7
 
+  # The session and security specs again, in Firefox: Web Locks, BroadcastChannel, cookies and the CSP are where browsers
+  # differ. Firefox is not on the runner, so it is downloaded here. It does not gate the deploy: a failure shows as a red
+  # check, and the job joins the `needs` of the deploys once it has proven stable.
+  e2e-firefox:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Firefox
+        run: npx playwright install --with-deps firefox
+
+      - name: Run the end-to-end tests in Firefox
+        run: npx playwright test --project=firefox
+        env:
+          E2E_FIREFOX: '1'
+
+      - name: Keep the report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-firefox
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   # The deploy jobs never run in the template repository itself: it has no Cloudflare project.
   deploy-dev:
     needs: [validate, e2e]

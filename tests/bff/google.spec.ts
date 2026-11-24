@@ -169,6 +169,22 @@ describe('POST /api/auth/exchange', () => {
     expect(response.status).toBe(400);
   });
 
+  it('should refuse with 413, reading nothing, a body over 16 KiB, and still delete the PKCE cookie', async () => {
+    const { cookie } = await startLogin();
+    const fetchMock = mockFetch(jsonUpstream(200, tokens));
+
+    const response = await call(exchange, buildRequest('/api/auth/exchange', {
+      body    : '{}',
+      cookie,
+      headers : { 'Content-Length': String(16 * 1024 + 1) },
+    }));
+
+    expect(response.status).toBe(413);
+    expect(await response.json()).toEqual({ message: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' });
+    expect(setCookies(response).some((entry) => entry.startsWith(`${PKCE}=;`) && entry.includes('Max-Age=0'))).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('should refuse a cross-site request', async () => {
     const { state, cookie } = await startLogin();
     const fetchMock = mockFetch(jsonUpstream(200, tokens));

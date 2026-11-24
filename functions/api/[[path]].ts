@@ -1,4 +1,4 @@
-import { readBodyWithLimit } from '../../server/body';
+import { PAYLOAD_TOO_LARGE, readBodyWithLimit } from '../../server/body';
 import { ALLOWED_ROUTES } from '../../server/routes';
 import { callApi, jsonResponse, passThrough, type Env } from '../../server/upstream';
 import { ACCESS_COOKIE, readCookie } from '../../server/cookies';
@@ -41,7 +41,7 @@ export const onRequest: PagesFunction<Env, 'path'> = async ({ request, env, para
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
   const body = hasBody ? await readBodyWithLimit(request) : undefined;
   if (body === null) {
-    return jsonResponse(413, { message: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' });
+    return jsonResponse(413, PAYLOAD_TOO_LARGE);
   }
 
   const search = new URL(request.url).search;

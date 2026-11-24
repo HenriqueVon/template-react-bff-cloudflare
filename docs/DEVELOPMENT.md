@@ -36,7 +36,7 @@ To see the session renew itself, give the fake API a short access token and run 
 | `npm run lint` | ESLint, no errors and no warnings |
 | `npm run check:ts` | `tsc -b` over the three TypeScript projects |
 | `npm run test:run` | Every unit, component and contract test once. `npm run test` starts watch mode |
-| `npm run test:e2e` | The app in a real browser (Playwright). Needs Chrome and the ports 4010 and 8788 free |
+| `npm run test:e2e` | The app in a real browser (Playwright). Needs Chrome and the ports 4010 and 8788 free. `E2E_FIREFOX=1` adds Firefox for the session and security specs, after `npx playwright install firefox` (a download); the CI runs it as its own job |
 | `npm run build` | `tsc -b` and `vite build`, into `dist/` |
 | `npm run preview` | Builds, then serves `dist/` with the Functions on port 8788 |
 
@@ -90,7 +90,7 @@ The tests use invented data only.
 
 - Stop `npm run dev` first: the tests start the fake API with a **4 second access token** and a **slow refresh** (`playwright.config.ts`), and reuse a server that already listens on 4010 or 8788, which would not have them.
 - The tests share the state of the fake API, so they run one at a time. A test makes its own data (a name with the time in it) and does not depend on another test.
-- The two-tabs test is the one that proves the lock between tabs ([ADR 0003](adr/0003-one-refresh-at-a-time.md)): with the lock removed from `refreshSession` it fails. Do the same experiment when you change that code.
+- The two-tabs test is the one that proves the lock between tabs ([ADR 0003](adr/0003-one-refresh-at-a-time.md)): with the lock removed from `refreshSession` it fails. The test of a logout during a slow refresh does the same for `logout` and `logoutAll`. Do the same experiment when you change that code.
 - A failed run keeps its screenshot and trace in `test-results/`, and the CI uploads them: `npx playwright show-trace <trace.zip>`.
 
 ### End-to-end check against your API

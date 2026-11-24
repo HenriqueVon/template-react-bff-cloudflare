@@ -98,6 +98,53 @@ describe('POST /api/auth/login', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  describe('size of the body', () => {
+    const TOO_LARGE = { message: 'Payload too large', code: 'PAYLOAD_TOO_LARGE' };
+
+    it('should refuse with 413, reading nothing, a body that declares more than 16 KiB', async () => {
+      const fetchMock = mockFetch(jsonUpstream(200, tokens));
+
+      const response = await call(login, loginRequest(credentials, { headers: { 'Content-Length': String(16 * 1024 + 1) } }));
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual(TOO_LARGE);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should refuse with 413 a body that has no declared length and grows past 16 KiB', async () => {
+      const fetchMock = mockFetch(jsonUpstream(200, tokens));
+      const chunk = new Uint8Array(8 * 1024).fill(97);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(chunk);
+          controller.enqueue(chunk);
+          controller.enqueue(chunk);
+          controller.close();
+        },
+      });
+      const request = new Request('https://app.test/api/auth/login', {
+        method  : 'POST',
+        headers : { Origin: 'https://app.test', 'X-Requested-With': 'my-web-app', 'Content-Type': 'application/json' },
+        body    : stream,
+        // @ts-expect-error `duplex` is required by the runtime to send a stream, and is missing from the DOM types.
+        duplex  : 'half',
+      });
+
+      const response = await call(login, request);
+
+      expect(response.status).toBe(413);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('should accept the largest credentials the route allows', async () => {
+      mockFetch(jsonUpstream(200, tokens));
+
+      const response = await call(login, loginRequest({ email: `${'a'.repeat(310)}@example.com`.slice(0, 320), password: 'a'.repeat(1024) }));
+
+      expect(response.status).toBe(200);
+    });
+  });
+
   it.each([
     ['no X-Requested-With', { csrf: false }],
     ['another origin', { origin: 'https://evil.test' }],

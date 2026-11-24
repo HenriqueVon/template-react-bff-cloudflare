@@ -1,6 +1,6 @@
 # API contract
 
-What the Functions (the BFF) expect from the API behind `API_URL`. The fake API in `mock-api/` implements all of it in memory, and `tests/contract/` runs the real Functions against it, so this document, the fake and the Functions cannot drift apart without a test failing. Your own API has to answer the same way, or the Functions change (this file, `mock-api/app.mjs` and `functions/` change together).
+What the Functions (the BFF) expect from the API behind `API_URL`. The fake API in `mock-api/` implements all of it in memory, and `tests/contract/` runs the real Functions against it, so the fake and the Functions cannot drift apart without a test failing. Nothing checks your own API: it has to answer the same way, or the Functions change (this file, `mock-api/app.mjs` and `functions/` change together).
 
 The browser never sees this contract: it only talks to `/api` on its own origin ([ARCHITECTURE.md](ARCHITECTURE.md)).
 
@@ -11,6 +11,8 @@ The browser never sees this contract: it only talks to `/api` on its own origin 
 - Requests and answers are JSON (`Content-Type: application/json`).
 - An error has the body `{ "message": string, "code": string }`. A `400` caused by the body or the query also has `issues: [{ "path": string, "message": string, "code": string }]`.
 - The proxy forwards a request body of at most **1 MiB** (`MAX_BODY_BYTES` in `server/body.ts`) and answers `413 PAYLOAD_TOO_LARGE` to a larger one without calling the API. Raise it for a route that takes uploads, or stream them.
+  - The login, which anyone can reach, accepts at most **16 KiB** (`MAX_AUTH_BODY_BYTES`) and answers the same `413`. <!-- @template:login-password:line -->
+  - The Google exchange, which anyone can reach, accepts at most **16 KiB** (`MAX_AUTH_BODY_BYTES`) and answers the same `413`. <!-- @template:login-google:line -->
 - The Functions add `Authorization: Bearer <access token>` to every call made for a signed-in user, plus the device of the browser: `X-End-User-IP` (from `CF-Connecting-IP`) and `X-End-User-Agent`. Store them on the session or in an audit log if you want; never trust `X-Forwarded-For`.
 - A tokens answer is `{ "accessToken": string, "tokenType": "Bearer", "expiresIn": number, "refreshToken": string }`. `expiresIn` is the lifetime of the access token in seconds; the Functions use it as the lifetime of the access cookie, so the cookie expires with the token.
 
@@ -28,6 +30,7 @@ The browser never sees this contract: it only talks to `/api` on its own origin 
 What each one has to guarantee:
 
 - **Refresh rotates the token.** The answer carries a new refresh token and the old one stops working. Using a replaced token again means it leaked: the API answers `401 AUTH_SESSION_REVOKED` and ends the whole session. This is why the browser makes sure that only one refresh runs at a time, across tabs ([ADR 0003](adr/0003-one-refresh-at-a-time.md)).
+- **Logout ends the whole session of the token it receives, even a token that was already replaced.** The browser waits for a refresh in progress before it logs out, but two requests can still cross on the way to the API (a refresh from a tab that has no Web Locks, a retry). If logout revoked only the token it was given, a refresh that was answered a moment earlier would leave a valid token in the browser after the user signed out. Revoking the session closes that, whatever the order.
 - **`GET /auth/me`** is how the app learns who is signed in and whether the session works. An expired access token must be told apart from an invalid one: `AUTH_TOKEN_EXPIRED` makes the app refresh and retry; any other `401` ends the session. An API without such a route can use another cheap authenticated call: only `src/auth/probe.ts` changes, and the user menu shows no name until it has one.
 - **A `403`** means the session is valid but this user has no access to this app. The app shows "no access" and does not log the user out.
 - **`429` and `5xx`** are temporary. The app keeps the session and shows a message (with the wait, from `Retry-After`).

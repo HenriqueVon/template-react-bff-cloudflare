@@ -1,3 +1,4 @@
+import { PAYLOAD_TOO_LARGE, readJsonWithLimit } from '../../../server/body';
 import { callApi, jsonResponse, type Env } from '../../../server/upstream';
 import { clearPkceCookie, readPkceCookie } from '../../../server/cookies';
 import { redirectUriOf } from '../../../server/login';
@@ -18,7 +19,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const headers = new Headers();
   clearPkceCookie(headers);
 
-  const body = await readBody(request);
+  // Anyone can reach this route, so the body is bounded before it is parsed.
+  const parsed = await readJsonWithLimit(request);
+  if (!parsed.ok && parsed.reason === 'too-large') {
+    return jsonResponse(413, PAYLOAD_TOO_LARGE, headers);
+  }
+
+  const body = parsed.ok ? validBody(parsed.value) : null;
   if (!body) {
     return jsonResponse(400, { message: 'Invalid body', code: 'BAD_REQUEST' }, headers);
   }
@@ -39,18 +46,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   return sessionResponse(upstream, headers);
 };
 
-async function readBody(request: Request): Promise<{ code: string; state: string } | null> {
-  try {
-    const body = await request.json() as { code?: unknown; state?: unknown };
+function validBody(value: unknown): { code: string; state: string } | null {
+  if (typeof value !== 'object' || value === null) return null;
 
-    if (
-      typeof body.code === 'string' && body.code.length >= 1 && body.code.length <= 256 &&
-      typeof body.state === 'string' && body.state.length >= 1 && body.state.length <= 512
-    ) {
-      return { code: body.code, state: body.state };
-    }
-  } catch {
-    // Not JSON.
+  const { code, state } = value as { code?: unknown; state?: unknown };
+
+  if (
+    typeof code === 'string' && code.length >= 1 && code.length <= 256 &&
+    typeof state === 'string' && state.length >= 1 && state.length <= 512
+  ) {
+    return { code, state };
   }
 
   return null;

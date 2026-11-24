@@ -23,15 +23,19 @@ First version, extracted from two web apps of the same author.
 - `docs/THREAT-MODEL.md`: the assets, the trust boundaries, sixteen threats with their mitigation and the test that proves it, the residual risks and what the API has to do.
 - `AGENTS.md`, the instructions for any AI coding agent; `CLAUDE.md` imports it, so there is one source.
 - `MOCK_REFRESH_DELAY_MS` for the fake API, to make two refreshes at once overlap.
+- The session and security specs also run in Firefox, as their own CI job that does not gate the deploy (`E2E_FIREFOX=1`; Firefox is downloaded). WebKit is not covered, and the threat model says why.
+- The API contract says that a logout ends the whole session of the token it receives, even a replaced one.
 
 ### Changed
 
-- The proxy allowlist ties the methods to each route (`server/routes.ts`): a read-only route is never forwarded a `DELETE`, and the `405` says what the route accepts. The proxy refuses a request body over 1 MiB with `413 PAYLOAD_TOO_LARGE` before calling the API.
+- The proxy allowlist ties the methods to each route (`server/routes.ts`): a read-only route is never forwarded a `DELETE`, and the `405` says what the route accepts. The proxy refuses a request body over 1 MiB with `413 PAYLOAD_TOO_LARGE` before calling the API. The login and the Google exchange, which anyone can reach, accept at most 16 KiB and answer the same `413`; before, they read the whole body.
+- The README and the API contract no longer say that "the contract cannot drift": the fake API and the Functions cannot drift apart without a test failing, but nothing checks the API of a project.
 - The documents say "no token exposed to JavaScript" instead of "no token in the browser", which was not precise: the tokens are in the browser, in cookies that scripts cannot read. They also say that HttpOnly does not stop a script from making requests as the user.
 
 ### Fixed
 
 - A logout that does not reach the Functions (no connection) no longer shows the login page while the cookies are still valid, which a reload would bypass: the session is kept and the app says so. The idle logout closes the screen anyway and sends the logout when the app opens again.
+- A logout that crossed a refresh in progress could leave new cookies in the browser, set by the late answer of the refresh after the logout cleared them. The logout and the logout from every device now take the same lock as the refresh.
 - The README said React Router 7 after the dependency moved to 8.
 
 [Unreleased]: https://github.com/HenriqueVon/template-react-bff-cloudflare/commits/main

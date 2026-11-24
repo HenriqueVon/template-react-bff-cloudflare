@@ -68,6 +68,37 @@ test.describe('the session, in a real browser', () => {
     await expect(second).toHaveURL(/\/login$/);
   });
 
+  test('a logout while another tab is refreshing leaves no cookie of the session behind', async ({ context }) => {
+    const first = await context.newPage();
+    await signIn(first);
+    const second = await context.newPage();
+    await second.goto('/');
+    await expect(second.getByRole('heading', { name: 'Overview' })).toBeVisible();
+
+    await first.waitForTimeout(AFTER_EXPIRY_MS);
+
+    // The first tab refreshes, and the fake API answers late (playwright.config.ts). The second tab signs out meanwhile.
+    // Without the lock the logout would clear the cookies first, and the late answer of the refresh would set new ones
+    // after it: the user would have left, and the browser would still hold a session.
+    const refreshSent = first.waitForRequest('**/api/auth/refresh');
+    const refreshAnswered = first.waitForResponse('**/api/auth/refresh');
+    await first.reload({ waitUntil: 'commit' });
+    await refreshSent;
+
+    await openUserMenu(second);
+    await second.getByRole('menuitem', { name: 'Sign out', exact: true }).click();
+
+    await expect(second).toHaveURL(/\/login$/);
+    await expect(first).toHaveURL(/\/login$/);
+
+    // The check has to wait for the late answer, or it would pass before the cookies are set.
+    await refreshAnswered;
+    await first.waitForTimeout(500);
+
+    const names = (await context.cookies()).map((cookie) => cookie.name);
+    expect(names.filter((name) => name.startsWith('__Host-app_'))).toEqual([]);
+  });
+
   test('keeps the session and offers to try again when the API is unavailable', async ({ page }) => {
     await signIn(page);
 
