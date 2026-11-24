@@ -6,21 +6,35 @@
 [![CodeQL](https://github.com/HenriqueVon/template-react-bff-cloudflare/actions/workflows/codeql.yml/badge.svg)](https://github.com/HenriqueVon/template-react-bff-cloudflare/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A production-minded starting point for web apps that sign users in and talk to an API: **React 19**, TypeScript, Vite, Tailwind and TanStack Query in the browser, and a **backend for the frontend on Cloudflare Pages Functions** that keeps every token out of the page. Create a project, run one command, and start with a session that renews itself, a strict CSP, a fake API to develop against, tests and CI.
+A production-minded starting point for web apps that sign users in and talk to an API: **React 19**, TypeScript, Vite, Tailwind and TanStack Query in the browser, and a **backend for the frontend on Cloudflare Pages Functions** that keeps every token out of reach of JavaScript. Create a project, run one command, and start with a session that renews itself, a strict CSP, a fake API to develop against, tests and CI.
 
 [**Use this template**](https://github.com/HenriqueVon/template-react-bff-cloudflare/generate)
 
 ## Why it is useful
 
-- **No token in the browser.** The access and the refresh token live in `__Host-` HttpOnly cookies set by the Functions, which also hold the API key and forward each call. A cross-site script cannot read the session, and the key is never in the bundle ([ADR 0001](docs/adr/0001-bff-with-httponly-cookies.md)).
+- **No token exposed to JavaScript.** The access and the refresh token live in `__Host-` HttpOnly cookies set by the Functions, which also hold the API key and forward each call. A script injected into the page cannot read or steal the session, and the key is never in the bundle. HttpOnly does not stop such a script from making requests as the user while the page is open, and the docs say so ([ADR 0001](docs/adr/0001-bff-with-httponly-cookies.md)).
 - **A session that behaves.** The refresh token rotates and only one refresh runs at a time, across tabs, so a user with three tabs open is not logged out by the API's reuse detection ([ADR 0003](docs/adr/0003-one-refresh-at-a-time.md)). Idle logout, logout on every tab and "sign out of all devices" are included.
 - **Two logins, one kept.** `npm run init -- --login password` or `--login google`: email and password, or Google with PKCE and `state`. The code, tests and docs of the other one are removed.
 - **Develops without an API.** A zero-dependency fake API implements the contract (login, rotation with reuse detection, the Google flow, a CRUD), so the template runs a minute after `npm install`. And **the real Functions are tested against it, with no mock**, so the contract cannot drift ([ADR 0005](docs/adr/0005-fake-api.md)).
-- **Strict by default.** A CSP with `'self'` in every directive and no inline code, a CSRF check, an allowlist for the proxy, and tests that fail if any of them is loosened ([ADR 0004](docs/adr/0004-strict-content-security-policy.md)).
+- **Tested in a real browser.** Playwright drives the build served the way Cloudflare serves it, with the real headers: the login, the session renewing itself, **two tabs refreshing at the same time**, a logout without a connection, the CSP, the cookies and the layout on a phone, a tablet and a laptop. The test of the race was checked by removing the lock and watching it fail ([ADR 0003](docs/adr/0003-one-refresh-at-a-time.md)). A CSP with `'self'` in every directive and no inline code, a CSRF check, an allowlist for the proxy, and tests that fail if any of them is loosened ([ADR 0004](docs/adr/0004-strict-content-security-policy.md)).
 - **A reference screen.** `src/pages/examples` is a complete paged CRUD (validation, dialogs, toasts, states, a table or cards) with a component test per flow, to copy when adding a resource.
 - **Two languages, checked by the compiler.** English and Portuguese: a key missing in one of them does not compile ([ADR 0006](docs/adr/0006-dictionary-checked-at-compile-time.md)).
 - **CI that proves the generator.** One workflow runs `npm run init` in four combinations and then lint, type check, tests and build on each generated project.
-- **Ready for AI-assisted work.** `CLAUDE.md` and `docs/` give an assistant, or a new teammate, the architecture, the rules and the checks to run.
+- **Ready for AI-assisted work.** `AGENTS.md` (imported by `CLAUDE.md`) and `docs/` give an AI agent, or a new teammate, the architecture, the rules, the limits of what it may do and the checks to run.
+
+## What it looks like
+
+The reference screen of the template, as a Playwright test captures it from the real app, with the fake API behind it (`SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts`). The colors are tokens in `src/index.css`: a project re-themes the app by changing them.
+
+![The list of examples: a table with the name, the description and the date, and the buttons to edit and delete](docs/images/examples.png)
+
+<table>
+  <tr>
+    <td width="36%"><img src="docs/images/login.png" alt="The login page, with the form of the password login and the button of the Google login"></td>
+    <td width="36%"><img src="docs/images/form.png" alt="The dialog to edit an example, with the field checked before it is sent"></td>
+    <td width="28%"><img src="docs/images/phone.png" alt="The list on a phone: cards instead of a table, and the menu at the bottom"></td>
+  </tr>
+</table>
 
 ## Use it
 
@@ -97,7 +111,7 @@ Set-Cookie: __Host-app_rt=session-….…; Path=/; Max-Age=2592000; HttpOnly; Se
 {"expiresIn":900}
 ```
 
-The tokens are in the cookies and the body has none: the page can never read them. The same request without the `X-Requested-With` header (what a form on another site would send) is refused:
+The tokens are in the cookies and the body has none: JavaScript in the page can never read them. The same request without the `X-Requested-With` header (what a form on another site would send) is refused:
 
 ```text
 HTTP/1.1 403 Forbidden
@@ -113,7 +127,7 @@ Cache-Control: no-store
 
 ```mermaid
 flowchart LR
-  spa["React app<br/>no token, no key"] -- "/api, cookies" --> fn["Pages Functions<br/>CSRF check, allowlist"]
+  spa["React app<br/>no token or key in JavaScript"] -- "/api, cookies" --> fn["Pages Functions<br/>CSRF check, allowlist"]
   fn -- "x-api-key + Bearer" --> api[("Your API")]
   fn -. "401 expired" .-> spa
   spa -. "one refresh at a time" .-> fn
@@ -128,6 +142,7 @@ The browser only talks to its own origin, so there is no CORS. An expired access
 | [docs/adr/](docs/adr/README.md) | Why each foundation was chosen, the alternatives, and what it costs |
 | [docs/API-CONTRACT.md](docs/API-CONTRACT.md) | What the Functions expect from the API, route by route |
 | [docs/SECURITY.md](docs/SECURITY.md) | The rules for a repository that may be public, and what the design does not give you |
+| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | The threats, the mitigation of each, the test that proves it, and the residual risks |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The session, the screens, the data layer and the folders |
 
 ## What is inside
@@ -144,9 +159,9 @@ docs/            architecture, conventions, development guide, API contract, sec
 | Concern | Choice |
 |---|---|
 | Runtime | Cloudflare Pages: static files and Functions on one origin |
-| Browser | React 19, React Router 7, TanStack Query 5, Tailwind 4, Vite 8 |
+| Browser | React 19, React Router 8, TanStack Query 5, Tailwind 4, Vite 8 |
 | Language | TypeScript, ready for 6 |
-| Tests | Vitest, Testing Library (jsdom) |
+| Tests | Vitest, Testing Library (jsdom), Playwright |
 | CI/CD | GitHub Actions, `wrangler pages deploy`, Dependabot, CodeQL |
 
 ---
@@ -158,7 +173,7 @@ docs/            architecture, conventions, development guide, API contract, sec
 
 > One sentence about what this app does. Replace this line.
 
-A React app that signs users in and talks to an API through a backend for the frontend on Cloudflare Pages Functions. The tokens live in HttpOnly cookies and never reach the browser.
+A React app that signs users in and talks to an API through a backend for the frontend on Cloudflare Pages Functions. The tokens live in HttpOnly cookies and are never exposed to JavaScript.
 
 **Stack:** TypeScript · React 19 · Vite · Tailwind 4 · TanStack Query · React Router · Cloudflare Pages Functions · Vitest.
 
@@ -208,12 +223,13 @@ A push to `develop` deploys the preview `develop.<project>.pages.dev`; a push to
 
 | Document | Purpose |
 |---|---|
-| [CLAUDE.md](CLAUDE.md) | How an AI assistant operates in this repository. |
+| [AGENTS.md](AGENTS.md) | How an AI agent operates in this repository. `CLAUDE.md` imports it. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the app is built today. |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | Setup, commands, step-by-step guides and pitfalls. |
 | [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | The rules new code follows. |
 | [docs/API-CONTRACT.md](docs/API-CONTRACT.md) | What the Functions expect from the API. |
 | [docs/SECURITY.md](docs/SECURITY.md) | The security rules of the repository and of the app. |
+| [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) | The threats, their mitigations and the residual risks. |
 | [docs/adr/](docs/adr/README.md) | Architecture decision records. |
 
 ## License

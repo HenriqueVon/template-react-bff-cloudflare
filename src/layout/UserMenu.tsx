@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { LogOut, MonitorSmartphone, User as UserIcon } from 'lucide-react';
 import { useAuth, useUser } from '@/auth/auth-context';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useToast } from '@/components/toast-context';
 import { useT } from '@/i18n/i18n-context';
 import { LanguageSwitch } from '@/i18n/LanguageSwitch';
 import { errorMessage } from '@/lib/errors';
@@ -11,6 +12,7 @@ export function UserMenu() {
   const t = useT();
   const user = useUser();
   const { logout, logoutAll } = useAuth();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
@@ -35,6 +37,17 @@ export function UserMenu() {
       document.removeEventListener('keydown', onKeyDown);
     };
   }, [open]);
+
+  // A logout that did not reach the Functions keeps the session (the cookies are still valid): say so and let the user
+  // try again, instead of showing a login page that a reload would bypass.
+  async function handleLogout() {
+    try {
+      await logout();
+    } catch (failure) {
+      setOpen(false);
+      toast.show(errorMessage(failure, t), 'error');
+    }
+  }
 
   async function handleLogoutAll() {
     setPending(true);
@@ -72,7 +85,7 @@ export function UserMenu() {
           <div className="border-b border-outline-variant/30 px-3 py-2">
             <LanguageSwitch />
           </div>
-          <button type="button" role="menuitem" className={itemClass} onClick={() => void logout()}>
+          <button type="button" role="menuitem" className={itemClass} onClick={() => void handleLogout()}>
             <LogOut size={18} aria-hidden="true" />
             {t('user.signOut')}
           </button>

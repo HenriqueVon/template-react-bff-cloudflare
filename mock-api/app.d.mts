@@ -7,6 +7,8 @@ export type MockApiOptions = {
   apiKey: string;
   // The lifetime of an access token, in seconds. Default 900.
   accessTtlSeconds?: number;
+  // How long the answer of a refresh takes, in milliseconds, after the token was replaced. Default 0.
+  refreshDelayMs?: number;
   // The hosts a redirect_uri may have. Default: localhost and 127.0.0.1.
   allowedRedirectHosts?: string[];
 };

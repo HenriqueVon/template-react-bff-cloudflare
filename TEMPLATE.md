@@ -25,7 +25,7 @@ Two ways to get a copy: on GitHub, **Use this template** on the template reposit
    `init` also creates `.dev.vars` from `.dev.vars.example` with a random `API_KEY` (the key is never printed), removes the files of the template, removes the `init` script and deletes itself. It needs no `npm install` first.
 3. Follow the "Next steps" it prints: `npm install`, then `npm run dev`.
 4. Edit the one-line description in `README.md`, then `git init` and make the first commit.
-5. Create the `develop` branch: `CLAUDE.md` and the workflow assume `develop` and `main`, and **Use this template** copies only the default branch.
+5. Create the `develop` branch: `AGENTS.md` and the workflow assume `develop` and `main`, and **Use this template** copies only the default branch.
 6. Before the first deploy, create the Cloudflare Pages project and the `dev` and `prd` environments in GitHub ([docs/DEVELOPMENT.md §7](docs/DEVELOPMENT.md#7-deployment)).
 
 ## What is included
@@ -41,9 +41,9 @@ Two ways to get a copy: on GitHub, **Use this template** on the template reposit
 | Data | `apiRequest` with the renewal of the session, `createResource` for the five usual routes, TanStack Query hooks |
 | Languages | English and Portuguese, with a dictionary the compiler checks |
 | Fake API | `mock-api/`: a zero-dependency server with the login, the Google flow, rotation of the refresh token, `GET /auth/me` and the example resource, used by `npm run dev`, the tests and the CI |
-| Tests | Vitest: the client, the resource builder, the session, the Functions with a mocked `fetch`, **the Functions against the fake API with no mock**, component tests in jsdom, and guardrails for a repository that may be public |
-| CI/CD | `validate` (lint, type check, tests, build), `audit`, deploy of `develop` (preview) and `main` (production) with `wrangler`, and Dependabot |
-| Docs and AI | `CLAUDE.md` and `docs/`: architecture, conventions, development guide, API contract, security rules and six decision records |
+| Tests | Vitest: the client, the resource builder, the session, the Functions with a mocked `fetch`, **the Functions against the fake API with no mock**, component tests in jsdom, guardrails for a repository that may be public, and **end-to-end tests in a real browser** (Playwright) against the build served with the real headers |
+| CI/CD | `validate` (lint, type check, tests, build), `audit`, `e2e` (Playwright), deploy of `develop` (preview) and `main` (production) with `wrangler`, and Dependabot |
+| Docs and AI | `AGENTS.md` (imported by `CLAUDE.md`) and `docs/`: architecture, conventions, development guide, API contract, security rules, a threat model and six decision records |
 
 ## Only in the template repository
 
@@ -53,6 +53,7 @@ These files describe or test the template, so `npm run init` deletes them and a 
 |---|---|---|
 | `TEMPLATE.md`, `CHANGELOG.md`, `SECURITY.md` | The guide, the release history and the security policy of the template | Settings → Security → enable **Private vulnerability reporting** (the policy points to it) |
 | `.github/workflows/codeql.yml` | CodeQL code scanning, free on public repositories only (private ones need GitHub Advanced Security) | none (it runs on push and weekly) |
+| `docs/images/`, `e2e/screenshots.spec.ts` | The pictures of the README, taken from the real app: `SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts` (stop `npm run dev` first). Run it again when the look of the app changes | none |
 | `.github/workflows/template-init.yml` | Tests the template **as a generator**: it runs `npm run init` on a copy, in four combinations (each login, with and without the example), checks that no name, marker or template-only file is left, and runs `npm ci`, lint, type check, the tests and the build on the generated project | none |
 
 The block of `README.md` between `<!-- @template:only:start -->` and `<!-- @template:only:end -->` (the showcase) goes away too.
@@ -76,7 +77,6 @@ These were chosen when the template was created. Change them in the template, no
 - Everything domain-specific: the administration screens (clients, roles, users, audit, MFA) and the finance screens (ledgers, funds, entries, categories, dashboards).
 - A state library, a form library and a component library. TanStack Query and the shared components are enough, and [docs/CONVENTIONS.md](docs/CONVENTIONS.md) says to keep it so.
 - Sentry, analytics and feature flags: they bring third-party hosts, which the CSP forbids by default.
-- A Playwright suite. The Functions are tested against the fake API; a browser suite is worth adding when the app has flows that only a browser can break.
 
 ## Differences from the source repositories (fixed while extracting)
 

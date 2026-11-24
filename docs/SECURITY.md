@@ -1,6 +1,6 @@
 # Security
 
-The security rules of the project. [CLAUDE.md](../CLAUDE.md) tells the assistant how to apply them; [ARCHITECTURE.md](ARCHITECTURE.md) shows where the app enforces them; [adr/](adr/README.md) explains why.
+The security rules of the project. [AGENTS.md](../AGENTS.md) tells the AI agents how to apply them; [ARCHITECTURE.md](ARCHITECTURE.md) shows where the app enforces them; [adr/](adr/README.md) explains why.
 
 **This repository may be public.** Anyone can read every file, every commit, every issue and every pull request, forever, and automated scanners read them within minutes. Treat everything you write here as published.
 
@@ -24,7 +24,7 @@ These apply to code, tests, fixtures, docs, comments, commit messages, branch na
 
 ## Rules for the app
 
-6. **No token or key in the browser.** Tokens live only in HttpOnly cookies set by the Functions. The `x-api-key` of the API is a secret of the Functions. Nothing sensitive in JavaScript, `localStorage`, `sessionStorage`, a `VITE_` variable or a URL.
+6. **No token or key exposed to JavaScript.** Tokens live only in HttpOnly cookies set by the Functions, which a script cannot read (it can still make requests as the user while the page is open: the CSP and React escaping are what limit that). The `x-api-key` of the API is a secret of the Functions. Nothing sensitive in JavaScript, `localStorage`, `sessionStorage`, a `VITE_` variable or a URL.
    - The only value in a URL is the single-use login `code` on `/auth/callback`, and the page removes it as soon as it reads it. <!-- @template:login-google:line -->
 7. **Cookies:** `__Host-` prefix, `HttpOnly`, `Secure`, `Path=/`, no `Domain`. Session cookies are `SameSite=Strict`.
    - The short-lived login (PKCE) cookie is `SameSite=Lax`, because the return from Google is a cross-site navigation, and it is deleted after use. <!-- @template:login-google:line -->

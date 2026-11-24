@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/auth-context';
 import { Button } from '@/components/Button';
@@ -9,11 +10,24 @@ import { errorMessage } from '@/lib/errors';
 export function NoAccessPage({ code }: { code?: string }) {
   const t = useT();
   const { logout } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  // A logout that did not reach the Functions keeps the session: say so, and the user can try again.
+  async function handleLogout() {
+    setError(null);
+
+    try {
+      await logout();
+    } catch (failure) {
+      setError(errorMessage(failure, t));
+    }
+  }
 
   return (
     <CenteredCard title={t('noAccess.title')}>
       <p className="text-body-md text-on-surface-variant">{errorMessage(new ApiError(403, 'Forbidden', code), t)}</p>
-      <Button variant="secondary" className="w-full" onClick={() => void logout()}>{t('user.signOut')}</Button>
+      {error && <p role="alert" className="text-body-md text-error">{error}</p>}
+      <Button variant="secondary" className="w-full" onClick={() => void handleLogout()}>{t('user.signOut')}</Button>
     </CenteredCard>
   );
 }

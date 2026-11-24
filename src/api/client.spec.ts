@@ -265,10 +265,24 @@ describe('login and logout calls', () => {
   });
   // @template:login-google:end
 
-  it('should never fail on logout, even without a connection', async () => {
-    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+  it('should resolve when the Function answers 204 to the logout', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
 
     await expect(logout()).resolves.toBeUndefined();
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/logout');
+  });
+
+  it('should throw when the logout does not reach the Function: the cookies are still there', async () => {
+    fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+
+    await expect(logout()).rejects.toMatchObject({ status: 0, code: 'NETWORK_ERROR' });
+  });
+
+  it('should throw on a gateway error of the logout', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>Bad gateway</html>', { status: 502 }));
+
+    await expect(logout()).rejects.toMatchObject({ status: 502 });
   });
 
   it('should throw when logout from all devices fails', async () => {

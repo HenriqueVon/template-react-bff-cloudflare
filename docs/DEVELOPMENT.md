@@ -25,7 +25,7 @@ The fake sign-in service signs in the demo user at once, with no Google involved
 
 The Functions read `.dev.vars` **when they start**; restart `npm run dev` after changing it. `npm run init` creates it from `.dev.vars.example` with a random `API_KEY`, which the fake API reads from the same file.
 
-To see the session renew itself, give the fake API a short access token and run the other two processes in other terminals: `MOCK_ACCESS_TTL_SECONDS=20 npm run dev:api` in a POSIX shell, or `$env:MOCK_ACCESS_TTL_SECONDS = 20; npm run dev:api` in PowerShell.
+To see the session renew itself, give the fake API a short access token and run the other two processes in other terminals: `MOCK_ACCESS_TTL_SECONDS=20 npm run dev:api` in a POSIX shell, or `$env:MOCK_ACCESS_TTL_SECONDS = 20; npm run dev:api` in PowerShell. `MOCK_REFRESH_DELAY_MS` makes the answer of a refresh slow, so two refreshes at once overlap (the end-to-end tests use it).
 
 ## 2. Commands
 
@@ -35,7 +35,8 @@ To see the session renew itself, give the fake API a short access token and run 
 | `npm run dev:api`, `dev:functions`, `dev:web` | One of the three |
 | `npm run lint` | ESLint, no errors and no warnings |
 | `npm run check:ts` | `tsc -b` over the three TypeScript projects |
-| `npm run test:run` | Every test once. `npm run test` starts watch mode |
+| `npm run test:run` | Every unit, component and contract test once. `npm run test` starts watch mode |
+| `npm run test:e2e` | The app in a real browser (Playwright). Needs Chrome and the ports 4010 and 8788 free |
 | `npm run build` | `tsc -b` and `vite build`, into `dist/` |
 | `npm run preview` | Builds, then serves `dist/` with the Functions on port 8788 |
 
@@ -46,7 +47,7 @@ Before reporting a change as done: `lint`, `check:ts`, `test:run`, `build`. For 
 1. Read [API-CONTRACT.md](API-CONTRACT.md): it lists what the Functions expect.
 2. Set `API_URL` (with the version path) and `API_KEY` in `.dev.vars`, and restart `npm run dev:functions`.
    - For the Google login, also set `AUTH_PUBLIC_URL` and `AUTH_CLIENT_ID`, and register `http://localhost:5173/auth/callback` as a redirect URL of the client at the sign-in service. <!-- @template:login-google:line -->
-3. Replace the paths of the proxy allowlist (`functions/api/[[path]].ts`) and the resource modules (`src/api/`) with those of your API. A path that is not in the allowlist answers `404`.
+3. Replace the routes of the proxy allowlist (`server/routes.ts`) and the resource modules (`src/api/`) with those of your API. A path that is not in the allowlist answers `404`.
 4. If the API has no `GET /auth/me`, change `src/auth/probe.ts` to use a cheap authenticated call.
 5. Stop the fake API (`dev:api`) and, when nothing needs it, delete `mock-api/`, `tests/contract/` and the script. Keep them while they are useful as a test double.
 
@@ -57,7 +58,7 @@ The development API may lack a route that exists only in a branch of your API. T
 Use the example screen as the model (`src/pages/examples/`, `src/api/examples.ts`, `src/i18n/messages/examples.ts`).
 
 1. **The API module.** `src/api/<resource>.ts`: the types of the API and `createResource({ key, path, orderBy })`. A resource whose routes differ writes its own calls.
-2. **The proxy.** Add the path to `ALLOWED_PATHS` in `functions/api/[[path]].ts`, and a case to `tests/bff/proxy.spec.ts` (and the fake API, if you keep it).
+2. **The proxy.** Add the route, with its methods, to `ALLOWED_ROUTES` in `server/routes.ts`, and a case to `tests/bff/routes.spec.ts` (and to the fake API, if you keep it).
 3. **The texts.** `src/i18n/messages/<resource>.ts` with both languages, registered in `src/i18n/messages.ts`.
 4. **The rules.** The limits of the API in `src/lib/validation.ts`.
 5. **The screen.** `src/pages/<resource>/<Resource>Page.tsx` and its form dialog, with `PagedListScreen`, `FormDialog`, `ConfirmDialog` and the toast.
@@ -79,8 +80,18 @@ Use the example screen as the model (`src/pages/examples/`, `src/api/examples.ts
 | Functions | `tests/bff/` | Each Function and the proxy, with a mocked `fetch` |
 | Contract | `tests/contract/` | The real Functions against the fake API, with no mock: the whole session, the rotation and the replay, the example resource |
 | Repository | `tests/repo/` | Secrets stay out of git, examples hold placeholders, the CSP keeps each directive to the own origin, the workflow keeps its protections |
+| End to end | `e2e/` | The build served by the Functions with the real headers, driven by a real browser: the login, the session renewing itself, two tabs refreshing at once, a logout without a connection, the CSP, the cookies, the layout on three widths, the example screen |
 
 The tests use invented data only.
+
+### End-to-end tests (Playwright)
+
+`npm run test:e2e` builds the app, serves it with the Functions the way Cloudflare does (the headers of `public/_headers` included) next to the fake API, and drives it with a real browser. It uses the browser installed on the machine, so nothing is downloaded: Chrome by default, which the GitHub runners have; `E2E_CHANNEL=msedge npm run test:e2e` uses Edge, and `E2E_CHANNEL=chromium` the one that `npx playwright install chromium` downloads. A fresh checkout gets a `.dev.vars` from the example, with placeholders.
+
+- Stop `npm run dev` first: the tests start the fake API with a **4 second access token** and a **slow refresh** (`playwright.config.ts`), and reuse a server that already listens on 4010 or 8788, which would not have them.
+- The tests share the state of the fake API, so they run one at a time. A test makes its own data (a name with the time in it) and does not depend on another test.
+- The two-tabs test is the one that proves the lock between tabs ([ADR 0003](adr/0003-one-refresh-at-a-time.md)): with the lock removed from `refreshSession` it fails. Do the same experiment when you change that code.
+- A failed run keeps its screenshot and trace in `test-results/`, and the CI uploads them: `npx playwright show-trace <trace.zip>`.
 
 ### End-to-end check against your API
 
@@ -117,4 +128,5 @@ The settings that only the owner can turn on in GitHub are in [SECURITY.md](SECU
 9. **A `503` is not a session problem.** The API being down must never log the user out: only `401` with a code that ends the session does.
 10. **TypeScript is on `~5.9.3`.** The configuration is ready for 6 (no `baseUrl`, relative `paths`) and the type check passes on 6.0.3. `typescript-eslint` supports up to `<6.1.0`, so do not go past 6.0 until it does.
 11. **Safari does not keep `Secure` cookies on `http://localhost`.** Chrome, Edge and Firefox treat `localhost` as a secure context and do; in Safari the login seems to work and the session never starts. Use another browser for local work, or serve the app over HTTPS.
-12. **The code of the Google login works once, and React runs effects twice in development.** `CallbackPage` guards the exchange with a ref. Do not remove it. <!-- @template:login-google:line -->
+12. **The end-to-end tests need the ports 4010 and 8788.** They reuse a server that is already there, and the one you run with `npm run dev` has a long access token and a fast refresh, so the session tests fail against it. Stop it first.
+13. **The code of the Google login works once, and React runs effects twice in development.** `CallbackPage` guards the exchange with a ref. Do not remove it. <!-- @template:login-google:line -->

@@ -30,6 +30,7 @@ export type AuthContextValue = {
   // @template:login-google:end
   // Checks the session again, after a temporary failure.
   retry         : () => void;
+  // Ends the session. Throws when the request did not reach the Functions (offline): the session is then kept.
   logout        : () => Promise<void>;
   // Ends every session of the user, on every device. Throws when it could not; the session in this browser is then
   // kept.

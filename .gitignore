@@ -9,6 +9,11 @@ logs
 *.log
 npm-debug.log*
 
+# Reports of the end-to-end tests
+playwright-report/
+test-results/
+blob-report/
+
 # Local secrets of the Pages Functions; copy .dev.vars.example. This repository may be public:
 # nothing in this block may ever be committed (docs/SECURITY.md).
 .dev.vars
