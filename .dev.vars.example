@@ -1,0 +1,20 @@
+# Variables of the Pages Functions (the BFF) for `npm run dev`. `npm run init` copies this file to .dev.vars,
+# which is not committed, with a random API_KEY. In Cloudflare Pages, set the same names as project variables
+# (API_KEY as an encrypted secret).
+#
+# This repository may be public: keep only placeholders and local addresses in this file, never a real host or key.
+
+# Base URL of the API, including its version path. Locally it is the fake API of this repository (npm run dev:api).
+API_URL=http://localhost:4010/v1/api
+
+# API key (x-api-key) of the API. Never put it in a VITE_ variable: those reach the browser.
+API_KEY=replace-with-the-api-key
+
+# @template:login-google:start
+# Base URL of the service that signs the user in with Google, without the version path. The browser is
+# redirected here to start the login. Locally it is the fake API as well.
+AUTH_PUBLIC_URL=http://localhost:4010
+
+# Public client id of this app at that service.
+AUTH_CLIENT_ID=replace-with-the-public-client-id
+# @template:login-google:end

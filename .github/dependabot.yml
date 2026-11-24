@@ -1,0 +1,36 @@
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # One pull request for the minor and patch updates of the week instead of one per package
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # TypeScript is held where typescript-eslint supports it (below 6.1). Remove the entry when it does.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # The types follow the Node.js version of the project (see .nvmrc), not the latest release.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "chore(ci)"
+    groups:
+      # One pull request per month with every action update, major versions included. The pull request checks
+      # only run `validate`: the deploy jobs are not exercised, so read the release notes first.
+      github-actions:
+        patterns:
+          - "*"

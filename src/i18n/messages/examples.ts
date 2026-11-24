@@ -1,0 +1,43 @@
+import { defineMessages } from '../define-messages';
+
+// The texts of the example screen. Copy this file for each screen you add, and delete it with the example.
+export const examples = defineMessages({
+  'en': {
+    'examples.title'             : 'Examples',
+    'examples.description'       : 'The reference screen of the template: a complete list, create, edit and delete.',
+    'examples.create'            : 'New example',
+    'examples.formNew'           : 'New example',
+    'examples.formEdit'          : 'Edit example',
+    'examples.nameHint'          : 'Between 3 and 100 characters. It must be different from the other examples.',
+    'examples.created'           : 'Example created.',
+    'examples.updated'           : 'Example updated.',
+    'examples.deleted'           : 'Example deleted.',
+    'examples.duplicate'         : 'An example with this name already exists.',
+    'examples.empty.title'       : 'No examples yet',
+    'examples.empty.description' : 'Create the first one to see how a screen works.',
+    'examples.deleteTitle'       : 'Delete example',
+    'examples.deleteBody'        : 'Delete the example {name}? This cannot be undone.',
+    'home.examples.one'          : 'There is {count} example.',
+    'home.examples.other'        : 'There are {count} examples.',
+    'home.examples.open'         : 'Open the examples',
+  },
+  'pt-BR': {
+    'examples.title'             : 'Exemplos',
+    'examples.description'       : 'A tela de referência do template: uma lista completa, com criar, editar e excluir.',
+    'examples.create'            : 'Novo exemplo',
+    'examples.formNew'           : 'Novo exemplo',
+    'examples.formEdit'          : 'Editar exemplo',
+    'examples.nameHint'          : 'Entre 3 e 100 caracteres. Precisa ser diferente dos outros exemplos.',
+    'examples.created'           : 'Exemplo criado.',
+    'examples.updated'           : 'Exemplo atualizado.',
+    'examples.deleted'           : 'Exemplo excluído.',
+    'examples.duplicate'         : 'Já existe um exemplo com este nome.',
+    'examples.empty.title'       : 'Nenhum exemplo ainda',
+    'examples.empty.description' : 'Crie o primeiro para ver como uma tela funciona.',
+    'examples.deleteTitle'       : 'Excluir exemplo',
+    'examples.deleteBody'        : 'Excluir o exemplo {name}? Esta ação não pode ser desfeita.',
+    'home.examples.one'          : 'Existe {count} exemplo.',
+    'home.examples.other'        : 'Existem {count} exemplos.',
+    'home.examples.open'         : 'Abrir os exemplos',
+  },
+});

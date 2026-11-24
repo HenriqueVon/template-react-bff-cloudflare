@@ -1,0 +1,149 @@
+# Proves that a project created from the template works, not only the template itself: it runs
+# `npm run init` on a copy, in four combinations (each login, with and without the example screen), and then runs
+# the checks of the generated project.
+# Template repository only: `npm run init` deletes this file.
+name: Test the init script
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  init:
+    name: init (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: password login with the example
+            service: orders-web
+            login: password
+            init_args: ""
+            example: present
+          - mode: password login without the example
+            service: crm-web
+            login: password
+            init_args: "--remove-example"
+            example: removed
+          - mode: Google login with the example
+            service: billing-web
+            login: google
+            init_args: ""
+            example: present
+          - mode: Google login without the example
+            service: sales-web
+            login: google
+            init_args: "--remove-example"
+            example: removed
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # The runner context is not available in the env of a job, so the folder is set here for the next steps
+      - name: Copy the template to a new project folder
+        run: |
+          project="$RUNNER_TEMP/${{ matrix.service }}"
+          echo "PROJECT_DIR=$project" >> "$GITHUB_ENV"
+          mkdir -p "$project"
+          rsync -a --exclude='.git/' ./ "$project/"
+
+      - name: Initialize the project
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: node scripts/init.mjs --name "${{ matrix.service }}" --login "${{ matrix.login }}" ${{ matrix.init_args }}
+
+      - name: Check that nothing of the template is left, and that the options were applied
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          failed=0
+
+          # Default names, markers and the text of the showcase must be gone from every file
+          if grep -rIn -E "my-web-app|My Web App|@template:|HenriqueVon|Use this template" --exclude=package-lock.json . ; then
+            echo "::error::Text of the template is left in the generated project (lines above)"
+            failed=1
+          fi
+
+          # Files that only make sense in the template repository
+          for path in TEMPLATE.md CHANGELOG.md SECURITY.md scripts \
+                      .github/workflows/codeql.yml .github/workflows/template-init.yml; do
+            if [ -e "$path" ]; then
+              echo "::error::$path should have been removed by init"
+              failed=1
+            fi
+          done
+
+          # The name reaches the package, the lockfile and the CSRF header of both sides
+          for file in package.json package-lock.json server/security.ts src/api/client.ts; do
+            grep -q "${{ matrix.service }}" "$file" || { echo "::error::$file does not contain the name of the project"; failed=1; }
+          done
+
+          # The login that was not chosen is gone, and the one that was chosen is there
+          if [ "${{ matrix.login }}" = "password" ]; then
+            [ -f functions/api/auth/login.ts ] || { echo "::error::The password login should be present"; failed=1; }
+            for path in functions/api/auth/exchange.ts functions/api/auth/google server/pkce.ts src/pages/CallbackPage.tsx; do
+              [ ! -e "$path" ] || { echo "::error::$path belongs to the Google login and should have been removed"; failed=1; }
+            done
+            if grep -rIn -E "PKCE|exchangeCode|AUTH_PUBLIC_URL|AUTH_CLIENT_ID" --include='*.ts' --include='*.tsx' --include='*.mjs' --include='*.example' . --exclude-dir=node_modules ; then
+              echo "::error::Code of the Google login is left in a project with the password login"
+              failed=1
+            fi
+          else
+            [ -f functions/api/auth/exchange.ts ] || { echo "::error::The Google login should be present"; failed=1; }
+            for path in functions/api/auth/login.ts tests/bff/login.spec.ts; do
+              [ ! -e "$path" ] || { echo "::error::$path belongs to the password login and should have been removed"; failed=1; }
+            done
+            if grep -rIn -E "login-password|AUTH_INVALID_CREDENTIALS|login\.password" --include='*.ts' --include='*.tsx' --include='*.mjs' . --exclude-dir=node_modules ; then
+              echo "::error::Code of the password login is left in a project with the Google login"
+              failed=1
+            fi
+          fi
+
+          # The example screen is kept or removed as asked
+          if [ "${{ matrix.example }}" = "present" ]; then
+            [ -d src/pages/examples ] || { echo "::error::The example screen should be present"; failed=1; }
+          else
+            for path in src/pages/examples src/api/examples.ts src/i18n/messages/examples.ts; do
+              [ ! -e "$path" ] || { echo "::error::$path should have been removed"; failed=1; }
+            done
+          fi
+
+          # .dev.vars exists, has a generated key and is not the placeholder
+          [ -f .dev.vars ] || { echo "::error::.dev.vars was not created"; failed=1; }
+          grep -q "^API_KEY=replace-with" .dev.vars && { echo "::error::.dev.vars still has the placeholder API key"; failed=1; }
+
+          exit $failed
+
+      - name: Install dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm ci
+
+      - name: Lint
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run lint
+
+      - name: Type check
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run check:ts
+
+      - name: Run tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run test:run
+
+      - name: Build
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run build
