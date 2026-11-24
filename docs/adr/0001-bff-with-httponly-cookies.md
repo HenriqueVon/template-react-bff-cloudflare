@@ -9,7 +9,7 @@ A single-page app that signs users in needs somewhere to keep the access token a
 
 ## Decision
 
-The browser never holds a token or the API key. A thin **backend for the frontend (BFF)**, a set of Functions on the same origin as the page, signs the user in with the API, keeps the tokens in `__Host-` cookies that are `HttpOnly`, `Secure` and `SameSite=Strict`, and forwards each call to the API adding the key and the access token as a Bearer token. Answers carry no token. State-changing requests need the same `Origin` and a custom header, and only paths of an allowlist are forwarded.
+JavaScript in the page never holds, reads or sees a token or the API key: the browser keeps the tokens only in cookies that scripts cannot read. A thin **backend for the frontend (BFF)**, a set of Functions on the same origin as the page, signs the user in with the API, keeps the tokens in `__Host-` cookies that are `HttpOnly`, `Secure` and `SameSite=Strict`, and forwards each call to the API adding the key and the access token as a Bearer token. Answers carry no token. State-changing requests need the same `Origin` and a custom header, and only paths of an allowlist are forwarded.
 
 ## Alternatives considered
 

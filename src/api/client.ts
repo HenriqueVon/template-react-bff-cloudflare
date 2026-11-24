@@ -182,10 +182,13 @@ export async function exchangeCode(code: string, state: string): Promise<void> {
 }
 // @template:login-google:end
 
-// Logout goes to its own function, without the refresh-and-retry above, and never fails: the cookies are cleared even
-// if the API could not be told.
+// Logout goes to its own function, without the refresh-and-retry above. The Function always answers 204 and clears the
+// cookies, even if the API could not be told. So a failure here means the request never reached the Function (no
+// connection, a gateway error): the cookies are still in the browser, and JavaScript cannot clear them. It is thrown, so
+// the app says so instead of showing a login page that a reload would bypass.
 export async function logout(): Promise<void> {
-  await send('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
+  const response = await send('/api/auth/logout', { method: 'POST' });
+  if (!response.ok) throw await toApiError(response);
 }
 
 // Unlike logout, a failure is thrown: the other sessions are still open, so the app must say so.

@@ -28,14 +28,16 @@ const SELF = join(ROOT, 'scripts', 'init.mjs');
 
 const toPath = (path) => join(ROOT, ...path.split('/'));
 
-// Files and folders that only make sense in the template repository (its guide, changelog, security policy, CodeQL setup
-// and the workflow that tests this script). They are never transformed and are deleted at the end.
+// Files and folders that only make sense in the template repository (its guide, changelog, security policy, CodeQL setup,
+// the workflow that tests this script, and the pictures of its README with the test that takes them). They are never transformed and are deleted at the end.
 const TEMPLATE_ONLY = [
   'TEMPLATE.md',
   'CHANGELOG.md',
   'SECURITY.md',
   '.github/workflows/codeql.yml',
   '.github/workflows/template-init.yml',
+  'docs/images',
+  'e2e/screenshots.spec.ts',
 ].map(toPath);
 
 // What belongs only to the reference example, to the password login and to the Google login. The lines that mention them
@@ -44,11 +46,13 @@ const EXAMPLE_FILES = [
   'src/api/examples.ts',
   'src/pages/examples',
   'src/i18n/messages/examples.ts',
+  'e2e/examples.spec.ts',
 ].map(toPath);
 
 const PASSWORD_FILES = [
   'functions/api/auth/login.ts',
   'tests/bff/login.spec.ts',
+  'e2e/login-password.spec.ts',
 ].map(toPath);
 
 const GOOGLE_FILES = [
@@ -61,6 +65,7 @@ const GOOGLE_FILES = [
   'src/pages/CallbackPage.tsx',
   'tests/bff/google.spec.ts',
   'tests/bff/pkce.spec.ts',
+  'e2e/login-google.spec.ts',
 ].map(toPath);
 
 function usage() {

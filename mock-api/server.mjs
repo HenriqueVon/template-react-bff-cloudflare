@@ -26,7 +26,10 @@ const apiKey = readDevVars().API_KEY || 'replace-with-the-api-key';
 // A short access token makes the refresh visible while you develop: MOCK_ACCESS_TTL_SECONDS=20 npm run dev:api
 const accessTtlSeconds = Number(process.env.MOCK_ACCESS_TTL_SECONDS ?? 900);
 
-createMockApi({ apiKey, accessTtlSeconds }).listen(port, '127.0.0.1', () => {
+// A slow answer of the refresh makes two refreshes at once overlap: MOCK_REFRESH_DELAY_MS=1000
+const refreshDelayMs = Number(process.env.MOCK_REFRESH_DELAY_MS ?? 0);
+
+createMockApi({ apiKey, accessTtlSeconds, refreshDelayMs }).listen(port, '127.0.0.1', () => {
   console.info(`Fake API on http://localhost:${port}/v1/api (access token lifetime: ${accessTtlSeconds} s)`);
   console.info(`Demo user: ${DEMO_USER.email} / ${DEMO_USER.password}`);
 });

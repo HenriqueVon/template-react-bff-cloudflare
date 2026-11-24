@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest } from '@/api/client';
+import { ToastProvider } from '@/components/ToastProvider';
 import { render } from '@/i18n/test-render';
 import { useAuth } from './auth-context';
 import { AuthProvider } from './AuthProvider';
@@ -25,7 +26,7 @@ function Probe() {
       {state.status === 'authenticated' && <p>{state.user.name}</p>}
       {state.status === 'anonymous' && <p data-testid="notice">{state.notice ?? 'none'}</p>}
       {state.status === 'forbidden' && <p data-testid="code">{state.code}</p>}
-      <button type="button" onClick={() => void auth.logout()}>logout</button>
+      <button type="button" onClick={() => auth.logout().catch(() => undefined)}>logout</button>
       <button type="button" onClick={() => auth.logoutAll().catch(() => undefined)}>logout-all</button>
       <button type="button" onClick={auth.retry}>retry</button>
       <button type="button" onClick={() => void apiRequest('/examples').catch(() => undefined)}>call</button>
@@ -45,9 +46,11 @@ function renderProvider() {
 
   render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Probe />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <Probe />
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -143,6 +146,36 @@ describe('AuthProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anonymous'));
     expect(screen.getByTestId('notice').textContent).toBe('none');
+  });
+
+  it('should keep the session when the logout does not reach the Functions: the cookies are still valid', async () => {
+    routes({
+      'GET /api/auth/me'      : () => json(200, user),
+      'POST /api/auth/logout' : () => {
+        throw new TypeError('fetch failed');
+      },
+    });
+    renderProvider();
+    await screen.findByText('Example Person');
+
+    await userEvent.click(screen.getByRole('button', { name: 'logout' }));
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('authenticated'));
+  });
+
+  it('should close the screen on idle even when the logout cannot be sent, and send it when the app opens again', async () => {
+    window.localStorage.setItem('my-web-app:last-activity', String(Date.now() - 31 * 60_000));
+    routes({
+      'GET /api/auth/me'      : () => json(200, user),
+      'POST /api/auth/logout' : () => {
+        throw new TypeError('fetch failed');
+      },
+    });
+
+    renderProvider();
+
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('anonymous'));
+    expect(screen.getByTestId('notice').textContent).toBe('idle');
   });
 
   it('should keep the session when the logout from every device fails: the other sessions are still open', async () => {

@@ -79,7 +79,7 @@ jobs:
           fi
 
           # Files that only make sense in the template repository
-          for path in TEMPLATE.md CHANGELOG.md SECURITY.md scripts \
+          for path in TEMPLATE.md CHANGELOG.md SECURITY.md scripts docs/images e2e/screenshots.spec.ts \
                       .github/workflows/codeql.yml .github/workflows/template-init.yml; do
             if [ -e "$path" ]; then
               echo "::error::$path should have been removed by init"

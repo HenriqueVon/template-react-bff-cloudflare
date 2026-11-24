@@ -58,7 +58,7 @@ This document answers one question: **when I write new code in this repository, 
 - A TanStack Query hook per resource in `src/api/<resource>.ts`, with its query keys. A resource with the usual five routes uses `createResource`.
 - Mutations invalidate exactly the queries they change.
 - Every call goes through `apiRequest` (`src/api/client.ts`). It sends the CSRF header, renews an expired token once and never adds a token.
-- A new API path is added to the allowlist in `functions/api/[[path]].ts` on purpose, with a test. Never widen it.
+- A new API route is added to `server/routes.ts` on purpose, with the methods the API defines for it and a test. Never widen it.
 - The types mirror the API ([API-CONTRACT.md](API-CONTRACT.md)). Dates arrive as ISO strings and are shown through `useFormat()`.
 
 **AVOID**
@@ -121,6 +121,7 @@ This document answers one question: **when I write new code in this repository, 
 **MUST**
 - A change to a Function has a test in `tests/bff/` with a mocked `fetch`; a change to the contract also changes `tests/contract/`.
 - A new screen with a form, a dialog or a flow of the user has a component test (`*.spec.tsx`, with `// @vitest-environment jsdom` at the top). Look for what the user sees (labels, roles, messages), not for the structure.
+- A change to the session, the cookies, the headers or a flow that crosses pages has an end-to-end test in `e2e/` (Playwright). Prove that a test of a protection can fail: remove the protection for a moment and watch the test break.
 - Fixtures use invented data and placeholders only.
 - Logic (`src/lib`, `src/api`, `src/auth`) has unit tests next to it (`*.spec.ts`).
 

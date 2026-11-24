@@ -96,9 +96,12 @@ function checkExample(body, { partial }) {
 }
 // @template:example:end
 
-// options: apiKey (required), accessTtlSeconds (default 900), allowedRedirectHosts (default: localhost only).
+// options: apiKey (required), accessTtlSeconds (default 900), refreshDelayMs (default 0: how long the answer of a refresh takes,
+// after the token was already replaced, to make two refreshes at once overlap in a test), allowedRedirectHosts (default:
+// localhost only).
 export function createMockApi(options) {
   const accessTtlSeconds = options.accessTtlSeconds ?? 900;
+  const refreshDelayMs = options.refreshDelayMs ?? 0;
   // @template:login-google:start
   const allowedRedirectHosts = options.allowedRedirectHosts ?? ['localhost', '127.0.0.1'];
   // @template:login-google:end
@@ -270,7 +273,11 @@ export function createMockApi(options) {
       return error(response, 401, 'AUTH_SESSION_REVOKED', 'Session revoked');
     }
 
-    json(response, 200, issueTokens(session.userId, token.sessionId));
+    // The token is replaced now; only the answer is late, as it is when the network or the API is slow.
+    const tokens = issueTokens(session.userId, token.sessionId);
+    if (refreshDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, refreshDelayMs));
+
+    json(response, 200, tokens);
   }
 
   async function logout(request, response) {

@@ -10,6 +10,7 @@ The browser never sees this contract: it only talks to `/api` on its own origin 
 - Every request carries `x-api-key: <API_KEY>`. A request without the right key is answered `401` with code `UNAUTHORIZED`.
 - Requests and answers are JSON (`Content-Type: application/json`).
 - An error has the body `{ "message": string, "code": string }`. A `400` caused by the body or the query also has `issues: [{ "path": string, "message": string, "code": string }]`.
+- The proxy forwards a request body of at most **1 MiB** (`MAX_BODY_BYTES` in `server/body.ts`) and answers `413 PAYLOAD_TOO_LARGE` to a larger one without calling the API. Raise it for a route that takes uploads, or stream them.
 - The Functions add `Authorization: Bearer <access token>` to every call made for a signed-in user, plus the device of the browser: `X-End-User-IP` (from `CF-Connecting-IP`) and `X-End-User-Agent`. Store them on the session or in an audit log if you want; never trust `X-Forwarded-For`.
 - A tokens answer is `{ "accessToken": string, "tokenType": "Bearer", "expiresIn": number, "refreshToken": string }`. `expiresIn` is the lifetime of the access token in seconds; the Functions use it as the lifetime of the access cookie, so the cookie expires with the token.
 
@@ -75,9 +76,9 @@ The fake API does all of this for the demo user, without Google, so the whole fl
 - The session: `AUTH_TOKEN_EXPIRED`, `AUTH_TOKEN_INVALID`, `AUTH_SESSION_REVOKED`, `AUTH_SESSION_MISSING`.
 - The password login: `AUTH_INVALID_CREDENTIALS`. <!-- @template:login-password:line -->
 - The Google login: `AUTH_CODE_INVALID`, `LOGIN_STATE_INVALID`. <!-- @template:login-google:line -->
-- The rest: `FORBIDDEN`, `CSRF_REJECTED`, `API_UNAVAILABLE`, `BFF_MISCONFIGURED`, `METHOD_NOT_ALLOWED`, `NETWORK_ERROR`, `NOT_FOUND`, `CONFLICT`.
+- The rest: `FORBIDDEN`, `CSRF_REJECTED`, `API_UNAVAILABLE`, `BFF_MISCONFIGURED`, `METHOD_NOT_ALLOWED`, `PAYLOAD_TOO_LARGE`, `NETWORK_ERROR`, `NOT_FOUND`, `CONFLICT`.
 
-`CSRF_REJECTED`, `API_UNAVAILABLE`, `BFF_MISCONFIGURED`, `METHOD_NOT_ALLOWED` and `NETWORK_ERROR` are produced by the Functions or the browser; the others are the answers of your API. Any other code falls back to the message of its status (`src/lib/errors.ts`, `src/i18n/messages/errors.ts`). The app never shows the raw message of the server.
+`CSRF_REJECTED`, `API_UNAVAILABLE`, `BFF_MISCONFIGURED`, `METHOD_NOT_ALLOWED`, `PAYLOAD_TOO_LARGE` and `NETWORK_ERROR` are produced by the Functions or the browser; the others are the answers of your API. Any other code falls back to the message of its status (`src/lib/errors.ts`, `src/i18n/messages/errors.ts`). The app never shows the raw message of the server.
 
 ## Changing the contract
 
@@ -85,4 +86,4 @@ The fake API does all of this for the demo user, without Google, so the whole fl
 2. Change `mock-api/app.mjs` and `mock-api/app.d.mts`.
 3. Change the Functions (`functions/`, `server/`) and, if the browser needs it, `src/api/`.
 4. Run `npm run test:run`: `tests/contract/` fails when the Functions and the fake API disagree.
-5. Add a new path to the allowlist in `functions/api/[[path]].ts` **on purpose**, with its test: the proxy never forwards "everything".
+5. Add a new route to `server/routes.ts` **on purpose**, with the methods the API defines for it and a test in `tests/bff/routes.spec.ts`: the proxy never forwards "everything", and never a method the route does not accept.

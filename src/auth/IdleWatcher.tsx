@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button';
 import { Modal } from '@/components/Modal';
+import { useToast } from '@/components/toast-context';
 import { useI18n } from '@/i18n/i18n-context';
+import { errorMessage } from '@/lib/errors';
 import { readLastActivity, saveLastActivity } from '@/lib/storage';
 import { idleStatus, secondsUntilIdle } from './idle';
 
@@ -12,8 +14,9 @@ const ACTIVITY_WRITE_INTERVAL_MS = 15_000;
 
 // Mounted while signed in. Counts the interactions of every tab through the shared last-activity
 // time, warns in the last minute and calls onIdle when the time is up.
-export function IdleWatcher({ onIdle, onLogout }: { onIdle: () => void; onLogout: () => void }) {
+export function IdleWatcher({ onIdle, onLogout }: { onIdle: () => void; onLogout: () => Promise<void> }) {
   const { t, tx } = useI18n();
+  const toast = useToast();
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   // This tab's own last activity, used when storage is unavailable. Set when the effect starts.
   const ownActivity = useRef(0);
@@ -78,6 +81,16 @@ export function IdleWatcher({ onIdle, onLogout }: { onIdle: () => void; onLogout
     setSecondsLeft(null);
   };
 
+  // When the logout does not reach the Functions the session is kept: say so, and the countdown goes on, so the
+  // screen still closes by itself when the time is up.
+  const signOutNow = async () => {
+    try {
+      await onLogout();
+    } catch (failure) {
+      toast.show(errorMessage(failure, t), 'error');
+    }
+  };
+
   return (
     <Modal title={t('idle.title')} onClose={stay}>
       <div className="space-y-4 text-body-md">
@@ -85,7 +98,7 @@ export function IdleWatcher({ onIdle, onLogout }: { onIdle: () => void; onLogout
           {tx('idle.body', { seconds: <strong className="text-on-surface">{t('idle.seconds', { count: secondsLeft })}</strong> })}
         </p>
         <div className="flex flex-col-reverse gap-2 md:flex-row md:justify-end">
-          <Button variant="secondary" onClick={onLogout}>{t('idle.signOutNow')}</Button>
+          <Button variant="secondary" onClick={() => void signOutNow()}>{t('idle.signOutNow')}</Button>
           <Button onClick={stay}>{t('idle.stay')}</Button>
         </div>
       </div>

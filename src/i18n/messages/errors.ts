@@ -22,6 +22,7 @@ export const errors = defineMessages({
     'error.code.NETWORK_ERROR'        : 'No connection to the server. Check your internet and try again.',
     'error.code.NOT_FOUND'            : 'Not found. It may have been removed.',
     'error.code.CONFLICT'             : 'A record with this data already exists, or it is in use.',
+    'error.code.PAYLOAD_TOO_LARGE'    : 'The data sent is too large.',
     'error.seconds'                   : '{count} seconds',
     'error.minute'                    : '1 minute',
     'error.minutes'                   : '{count} minutes',
@@ -53,6 +54,7 @@ export const errors = defineMessages({
     'error.code.NETWORK_ERROR'        : 'Sem conexão com o servidor. Verifique sua internet e tente de novo.',
     'error.code.NOT_FOUND'            : 'Não encontrado. Talvez tenha sido removido.',
     'error.code.CONFLICT'             : 'Já existe um registro com esses dados, ou ele está em uso.',
+    'error.code.PAYLOAD_TOO_LARGE'    : 'Os dados enviados são grandes demais.',
     'error.seconds'                   : '{count} segundos',
     'error.minute'                    : '1 minuto',
     'error.minutes'                   : '{count} minutos',
@@ -76,5 +78,5 @@ export const ERROR_CODES = [
   'AUTH_CODE_INVALID', 'LOGIN_STATE_INVALID',
   // @template:login-google:end
   'FORBIDDEN', 'CSRF_REJECTED', 'API_UNAVAILABLE', 'BFF_MISCONFIGURED', 'METHOD_NOT_ALLOWED', 'NETWORK_ERROR', 'NOT_FOUND',
-  'CONFLICT',
+  'CONFLICT', 'PAYLOAD_TOO_LARGE',
 ] as const;

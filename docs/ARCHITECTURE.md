@@ -8,7 +8,7 @@ How the app is built today. Why it is built this way is in [adr/](adr/README.md)
 ┌─────────────── browser ───────────────┐      ┌──── Cloudflare Pages ────┐      ┌──── API ────┐
 │ React SPA (src/)                       │      │ Functions (functions/,   │      │ /v1/api/*   │
 │  screen → hook → apiRequest            │─────▶│ server/)                 │─────▶│             │
-│  no token, no API key                  │ /api │ adds x-api-key + Bearer  │      │ API key +   │
+│  no token or key in JavaScript         │ /api │ adds x-api-key + Bearer  │      │ API key +   │
 │  cookies sent by the browser (HttpOnly)│◀─────│ sets and clears cookies  │◀─────│ Bearer token│
 └────────────────────────────────────────┘      └──────────────────────────┘      └─────────────┘
 ```
@@ -25,7 +25,7 @@ The page and `/api` share one origin, so there is no CORS.
 1. **Screen** calls a hook, for example `useExamplePage(page)` (`src/api/examples.ts`).
 2. **Hook** owns the cache key and calls `apiRequest`. `createResource` (`src/api/resource.ts`) builds the calls and hooks of a resource that follows the five usual routes.
 3. **HTTP client** (`src/api/client.ts`) calls `GET /api/examples?limit=20&offset=0&…`, sending `X-Requested-With: my-web-app` and the cookies. It never adds a token.
-4. **Proxy** (`functions/api/[[path]].ts`) refuses any method other than `GET`, `POST`, `PATCH` and `DELETE` with `405`, refuses a cross-site write, refuses `.`, `..` and empty segments and any path outside the allowlist with `404`, returns `401 AUTH_TOKEN_EXPIRED` when the access cookie is missing, and forwards method, query, body and `Content-Type`.
+4. **Proxy** (`functions/api/[[path]].ts`) refuses a cross-site write, refuses `.`, `..` and empty segments and any path outside the allowlist (`server/routes.ts`) with `404`, refuses a method that the route does not accept with `405` and an `Allow` header, returns `401 AUTH_TOKEN_EXPIRED` when the access cookie is missing, refuses a body larger than 1 MiB with `413`, and forwards method, query, body and `Content-Type`.
 5. **API call** (`server/upstream.ts`) adds `x-api-key` and `Authorization: Bearer <access cookie>`, plus the device of the browser. A network failure or a timeout (10 seconds) becomes `503 API_UNAVAILABLE`; a missing variable becomes `500 BFF_MISCONFIGURED`, logged by name only.
 6. **Response** goes back unchanged, keeping only `Content-Type` and `Retry-After`, with `Cache-Control: no-store`. A `Set-Cookie` of the API is never passed on.
 7. **In the browser** a non-2xx response becomes an `ApiError` (status, `code`, `retryAfter`, validation `issues`), and the screen shows it with `errorMessage`, by code, in the language of the user.
@@ -40,8 +40,8 @@ The page and `/api` share one origin, so there is no CORS.
 | **Access token expired** | `401 AUTH_TOKEN_EXPIRED` makes `apiRequest` call `refreshSession()` once and retry. Only one refresh runs at a time: tabs share it through a promise and `navigator.locks` ([ADR 0003](adr/0003-one-refresh-at-a-time.md)). |
 | **Other 401s** | `AUTH_TOKEN_INVALID`, `AUTH_SESSION_REVOKED` and `AUTH_SESSION_MISSING` do not refresh: the session is over and the login is shown with a message. A refresh that fails for a temporary reason (`429`, `503`, network) is thrown to the screen and never ends the session. |
 | **403** | `FORBIDDEN` shows "no access", not the login. |
-| **Logout** | `POST /api/auth/logout` revokes the session and clears the cookies; "Sign out of all devices" calls `/api/auth/logout-all` after a confirmation and clears the cookies only on success. |
-| **Idle** | After 30 minutes without interaction in any tab, with a warning in the last minute, the app logs out. The last-activity time is shared by every tab in `localStorage`. |
+| **Logout** | `POST /api/auth/logout` revokes the session and clears the cookies; the Function always answers `204`. If the request never reaches the Function (no connection), the cookies are still valid and JavaScript cannot clear them, so the session is **kept** and the screen says so, instead of showing a login page that a reload would bypass. "Sign out of all devices" calls `/api/auth/logout-all` after a confirmation and clears the cookies only on success. |
+| **Idle** | After 30 minutes without interaction in any tab, with a warning in the last minute, the app logs out. The last-activity time is shared by every tab in `localStorage`. The screen closes even when the logout cannot be sent (the user is away); the idle time is still over when the app opens again, so the logout is sent then. |
 | **Other tabs** | A logout is posted on a `BroadcastChannel`; the other tabs clear their cache and show the login. |
 
 ## 4. Routes
@@ -110,6 +110,7 @@ src/                  main.tsx, App.tsx (providers and routes), index.css (token
 tests/bff/            the Functions, with a mocked fetch
 tests/contract/       the Functions against the fake API, with no mock
 tests/repo/           guardrails for a repository that may be public
+e2e/                 Playwright: the app in a real browser, with the real headers and the fake API
 public/               _headers (CSP, security headers, caching), robots.txt, favicon
 .github/              CI, Dependabot, pull request template
 ```
@@ -122,21 +123,22 @@ Tests and helper code stay out of `functions/`, because Pages turns every file t
 |---|---|---|
 | Cookies | `server/cookies.ts` | `__Host-` prefix, HttpOnly, Secure, `Path=/`; session `SameSite=Strict` |
 | CSRF | `server/security.ts` | Writes need the same `Origin` and `X-Requested-With` |
-| Allowlist | `functions/api/[[path]].ts` | Only the listed paths; only `GET`, `POST`, `PATCH`, `DELETE`; no path traversal |
+| Allowlist | `server/routes.ts`, `functions/api/[[path]].ts` | Only the listed paths, each with its own methods; no path traversal; a request body of at most 1 MiB |
 | Secrets | Pages environment | `API_KEY` exists only in the Functions |
 | Headers | `public/_headers` | CSP `'self'` for every directive (no `unsafe-inline`, no `data:`; checked by `tests/repo/csp.spec.ts`), HSTS, no framing, `nosniff`, no referrer, no indexing |
 | Guardrails | `tests/repo/` | `.dev.vars` ignored, examples hold placeholders, no secret patterns in tracked files, no secret in a `VITE_` variable |
 | Idle logout | `src/auth/` | Logout after 30 minutes without interaction, in every tab |
 | Responses | `passThrough`, `jsonResponse` | `Cache-Control: no-store`; only `Content-Type` and `Retry-After` are passed on; never `Set-Cookie` |
-| Browser | `src/` | No token or key anywhere; React escaping only; the return path and the callback parameters are validated before use |
+| Browser | `src/` | No token or key in JavaScript, storage or URLs; React escaping only; the return path and the callback parameters are validated before use |
 
 The API still checks everything itself: the key, the token and the input. The checks of the app are a second line, never the only one ([SECURITY.md](SECURITY.md)).
 
 ## 10. Build, type check and tests
 
 - `npm run build` runs `tsc -b` and then `vite build`. It writes `dist/`: `index.html`, hashed assets and the files of `public/`.
-- TypeScript projects, referenced by `tsconfig.json`: `tsconfig.app.json` (`src/`, for the browser), `tsconfig.functions.json` (`functions/`, `server/`, `tests/bff`, `tests/contract`, with the Workers types) and `tsconfig.node.json` (the config files and `tests/repo`).
+- TypeScript projects, referenced by `tsconfig.json`: `tsconfig.app.json` (`src/`, for the browser), `tsconfig.functions.json` (`functions/`, `server/`, `tests/bff`, `tests/contract`, with the Workers types) `tsconfig.node.json` (the config files and `tests/repo`) and `tsconfig.e2e.json` (`e2e/` and `playwright.config.ts`, with the DOM types for the code that runs in the page).
 - Vitest runs `tests/**/*.spec.ts`, `src/**/*.spec.ts` and `src/**/*.spec.tsx`. The logic and the Functions run in Node. A **component test** (`*.spec.tsx`) renders the component with Testing Library in jsdom: it starts with the comment `// @vitest-environment jsdom`, so the other tests keep running in Node. `tests/setup-dom.ts` cleans the document after each test, saves English as the language and gives jsdom the `showModal` and `close` of the native `<dialog>` that `Modal` uses. The tests look for what the user sees (labels, roles, messages), not for the structure.
+- **End-to-end tests** (`e2e/`, `npm run test:e2e`) drive a real browser (Playwright, with the Chrome of the machine) against the build served by the Functions with the real headers and the fake API behind them, which is where the CSP, the cookies, the refresh between tabs and the layout are decided. They are not part of `npm run test:run`: they need a browser and two free ports, and the CI runs them as their own job before the deploy.
 - Locally, `wrangler pages dev` runs the Functions on port 8788, and Vite on 5173 proxies `/api` to it. On Cloudflare Pages, the same `dist/` and `functions/` are deployed together, by the GitHub Actions workflow after lint, type check, tests and build pass.
 
 ## 11. Environment variables

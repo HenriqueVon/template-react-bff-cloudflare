@@ -57,14 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'anonymous', notice });
   }, [queryClient]);
 
+  // Throws when the Function could not be reached: the cookies are then still valid, so the session is kept and the
+  // screen says so, instead of showing a login page that a reload would bypass.
   const logout = useCallback(async () => {
     await logoutRequest();
     channel.current?.postLogout('logout');
     endSession(null);
   }, [endSession]);
 
+  // The user is away, so the screen is closed even when the logout could not be sent. The cookies stay until it is: the
+  // next time the app opens, the idle time is still over and this runs again.
   const logoutIdle = useCallback(async () => {
-    await logoutRequest();
+    await logoutRequest().catch(() => undefined);
     channel.current?.postLogout('idle');
     endSession('idle');
   }, [endSession]);
