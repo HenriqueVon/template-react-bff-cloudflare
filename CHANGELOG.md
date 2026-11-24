@@ -16,7 +16,7 @@ First version, extracted from two web apps of the same author.
 - English and Portuguese, with a dictionary the compiler checks.
 - A strict CSP with `'self'` in every directive and no inline code, and tests that fail if it is loosened.
 - Tests: the client, the resource builder, the session, the Functions with a mocked `fetch`, the Functions against the fake API with no mock, component tests in jsdom and guardrails for a repository that may be public.
-- GitHub Actions: `validate`, `audit`, deploy of `develop` (preview) and `main` (production) with `wrangler`; CodeQL; and a workflow that tests the `init` script in four combinations and runs the checks of each generated project. Dependabot.
+- GitHub Actions: `validate`, `audit`, deploy of `develop` (preview) and `main` (production) with `wrangler`; CodeQL; and a workflow that tests the `init` script in four combinations and runs the checks of each generated project, the end-to-end tests included. Dependabot.
 - `npm run init`, a dependency-free script that names a new project, picks the login and can remove the example.
 - `AGENTS.md` (imported by `CLAUDE.md`) and `docs/` with architecture, conventions, development guide, API contract, security rules and six decision records.
 - End-to-end tests in a real browser (`npm run test:e2e`, Playwright with the Chrome of the machine, so nothing is downloaded) against the build served by the Functions with the real headers and the fake API: the login, the session renewing itself, two tabs refreshing at once, a logout without a connection, the CSP, the cookies, the layout on three widths and the example screen. They run as their own CI job, which gates the deploy.

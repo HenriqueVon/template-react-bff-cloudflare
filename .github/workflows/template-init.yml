@@ -1,6 +1,6 @@
 # Proves that a project created from the template works, not only the template itself: it runs
 # `npm run init` on a copy, in four combinations (each login, with and without the example screen), and then runs
-# the checks of the generated project.
+# the checks of the generated project: lint, type check, unit and contract tests, build and end-to-end tests.
 # Template repository only: `npm run init` deletes this file.
 name: Test the init script
 
@@ -147,3 +147,18 @@ jobs:
       - name: Build
         working-directory: ${{ env.PROJECT_DIR }}
         run: npm run build
+
+      # The end-to-end specs belong to a login or to the example, so each combination runs a different set: this is what
+      # proves that `init` kept the right ones and that they pass in the project it generated. Chrome is already on the runner.
+      - name: Run the end-to-end tests
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: npm run test:e2e
+
+      - name: Keep the report of a failed run
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.service }}
+          path: ${{ env.PROJECT_DIR }}/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
