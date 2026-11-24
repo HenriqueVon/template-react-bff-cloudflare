@@ -54,7 +54,7 @@ These files describe or test the template, so `npm run init` deletes them and a 
 | `TEMPLATE.md`, `CHANGELOG.md`, `SECURITY.md` | The guide, the release history and the security policy of the template | Settings → Security → enable **Private vulnerability reporting** (the policy points to it) |
 | `.github/workflows/codeql.yml` | CodeQL code scanning, free on public repositories only (private ones need GitHub Advanced Security) | none (it runs on push and weekly) |
 | `docs/images/`, `e2e/screenshots.spec.ts` | The pictures of the README, taken from the real app: `SCREENSHOTS=1 npx playwright test e2e/screenshots.spec.ts` (stop `npm run dev` first). Run it again when the look of the app changes | none |
-| `.github/workflows/template-init.yml` | Tests the template **as a generator**: it runs `npm run init` on a copy, in four combinations (each login, with and without the example), checks that no name, marker or template-only file is left, and runs `npm ci`, lint, type check, the tests and the build on the generated project | none |
+| `.github/workflows/template-init.yml` | Tests the template **as a generator**: it runs `npm run init` on a copy, in four combinations (each login, with and without the example), checks that no name, marker or template-only file is left, and runs `npm ci`, lint, type check, the tests, the build and the end-to-end tests on the generated project | none |
 
 The block of `README.md` between `<!-- @template:only:start -->` and `<!-- @template:only:end -->` (the showcase) goes away too.
 
